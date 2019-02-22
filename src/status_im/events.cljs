@@ -5,6 +5,7 @@
             [status-im.accounts.login.core :as accounts.login]
             [status-im.accounts.logout.core :as accounts.logout]
             [status-im.accounts.recover.core :as accounts.recover]
+            [status-im.ui.screens.add-new.new-chat.db :as new-chat.db]
             [status-im.accounts.update.core :as accounts.update]
             [status-im.bootnodes.core :as bootnodes]
             [status-im.browser.core :as browser]
@@ -1612,6 +1613,11 @@
  (fn [cofx [_ chat-id envelope-hash]]
    (transport.message/set-contact-message-envelope-hash cofx chat-id envelope-hash)))
 
+(handlers/register-handler-fx
+ :transport.callback/node-info-fetched
+ (fn [cofx [_ node-info]]
+   (transport/set-node-info cofx node-info)))
+
 ;; contact module
 
 (handlers/register-handler-fx
@@ -1642,13 +1648,24 @@
 (handlers/register-handler-fx
  :contact/qr-code-scanned
  [(re-frame/inject-cofx :random-id-generator)]
- (fn [cofx [_ _ contact-identity]]
-   (contact/handle-qr-code cofx contact-identity)))
+ (fn [{:keys [db] :as cofx}  [_ _ contact-identity]]
+   (let [current-account (:account/account db)
+         fx              {:db (assoc db :contacts/new-identity contact-identity)}
+         validation-result (new-chat.db/validate-pub-key db contact-identity)]
+     (if (some? validation-result)
+       {:utils/show-popup {:title (i18n/label :t/unable-to-read-this-code)
+                           :content validation-result
+                           :on-dismiss #(re-frame/dispatch [:navigate-to-clean :home])}}
+       (fx/merge cofx
+                 fx
+                 (if config/partitioned-topic-enabled?
+                   (contact/add-contacts-filter contact-identity :open-chat)
+                   (chat/start-chat contact-identity {:navigation-reset? true})))))))
 
 (handlers/register-handler-fx
  :contact/filters-added
  (fn [cofx [_ contact-identity]]
-   (contact/open-chat cofx contact-identity)))
+   (chat/start-chat cofx contact-identity {:navigation-reset? true})))
 
 (handlers/register-handler-fx
  :contact.ui/start-group-chat-pressed
@@ -1659,13 +1676,13 @@
  :contact.ui/send-message-pressed
  [(re-frame/inject-cofx :random-id-generator)]
  (fn [cofx [_ {:keys [public-key]}]]
-   (contact/open-chat cofx public-key)))
+   (chat/start-chat cofx public-key {:navigation-reset? true})))
 
 (handlers/register-handler-fx
  :contact.ui/contact-code-submitted
  [(re-frame/inject-cofx :random-id-generator)]
- (fn [cofx _]
-   (contact/add-new-identity-to-contacts cofx)))
+ (fn [{{:contacts/keys [new-identity]} :db :as cofx} _]
+   (chat/start-chat cofx new-identity {:navigation-reset? true})))
 
 ;; search module
 
@@ -1814,11 +1831,6 @@
  (fn [cofx _]
    (stickers/pending-timeout cofx)))
 
-(handlers/register-handler-fx
- :transport.callback/node-info-fetched
- (fn [cofx [_ node-info]]
-   (transport/set-node-info cofx node-info)))
-
 ;; Tribute to Talk
 (handlers/register-handler-fx
  :tribute-to-talk.ui/menu-item-pressed
@@ -1860,6 +1872,59 @@
  (fn [cofx _]
    (tribute-to-talk/remove cofx)))
 
+(handlers/register-handler-fx
+ :tribute-to-talk.ui/tribute-transaction-sent
+ (fn [cofx [_ identity id result method]]
+   (tribute-to-talk/fetch-tribute-tx-id cofx identity result)))
+
+(handlers/register-handler-fx
+ :tribute-to-talk.callback/check-manifest-success
+ (fn [cofx  [_ identity contenthash]]
+   (tribute-to-talk/fetch-manifest cofx identity contenthash)))
+
+(handlers/register-handler-fx
+ :tribute-to-talk.callback/no-manifest-found
+ (fn [cofx  [_ identity]]
+   (tribute-to-talk/update-settings cofx nil)))
+
+(handlers/register-handler-fx
+ :tribute-to-talk.callback/fetch-manifest-success
+ (fn [cofx  [_ identity manifest]]
+   (tribute-to-talk/update-settings cofx manifest)))
+
+(handlers/register-handler-fx
+ :tribute-to-talk.callback/fetch-manifest-failure
+ (fn [cofx  [_ identity contenthash]]
+   (tribute-to-talk/fetch-manifest cofx identity contenthash)))
+
+(handlers/register-handler-fx
+ :tribute-to-talk.ui/check-manifest
+ (fn [{:keys [db] :as cofx}  [_ identity]]
+   (tribute-to-talk/check-manifest cofx identity)))
+
+(handlers/register-handler-fx
+ :tribute-to-talk.callback/manifest-uploaded
+ (fn [cofx [_ hash]]
+   (tribute-to-talk/set-manifest-signing-flow cofx hash)))
+
+(handlers/register-handler-fx
+ :tribute-to-talk.callback/set-manifest-transaction-completed
+ (fn [cofx [_ id transaction-hash method]]
+   (tribute-to-talk/on-set-manifest-transaction-completed cofx
+                                                          transaction-hash)))
+
+(handlers/register-handler-fx
+ :tribute-to-talk.callback/set-manifest-transaction-failed
+ (fn [cofx [_ error]]
+   (tribute-to-talk/on-set-manifest-transaction-failed cofx
+                                                       error)))
+
+(handlers/register-handler-fx
+ :tribute-to-talk/check-set-manifest-transaction-timeout
+ (fn [cofx _]
+   (tribute-to-talk/check-set-manifest-transaction cofx)))
+
+;; bottom-sheet events
 (handlers/register-handler-fx
  :bottom-sheet/show-sheet
  (fn [cofx [_ view]]

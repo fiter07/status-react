@@ -31,11 +31,20 @@
   {:background-color (colors/alpha colors/blue 0.1)
    :border-radius    50})
 
-(def action-label
-  {:color colors/blue})
+(defn action-label [with-subtext?]
+  (cond-> {:color colors/blue}
+    with-subtext?
+    (assoc :font-size 15
+           :line-height 22
+           :font-weight "500")))
+
+(def action-subtext
+  {:line-height 22
+   :font-size   15
+   :color colors/gray})
 
 (def action-separator
-  {:height           1
+  {:height           0
    :background-color colors/gray-light
    :margin-left      50})
 

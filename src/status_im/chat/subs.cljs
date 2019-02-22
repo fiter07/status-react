@@ -6,6 +6,7 @@
             [status-im.chat.constants :as chat.constants]
             [status-im.chat.db :as chat.db]
             [status-im.models.transactions :as transactions]
+            [status-im.tribute-to-talk.core :as tribute-to-talk]
             [status-im.utils.platform :as platform]
             [status-im.utils.universal-links.core :as links]
             [status-im.ui.components.bottom-bar.styles :as tabs.styles]
@@ -128,13 +129,17 @@
  :<- [:chats/active-chats]
  :<- [:chats/current-chat-id]
  (fn [[chats current-chat-id]]
-   (let [current-chat (get chats current-chat-id)
+   (println :current-chat)
+   (let [{:keys [group-chat contact] :as current-chat}
+         (get chats current-chat-id)
          messages     (:messages current-chat)]
-     (if (empty? messages)
-       (assoc current-chat
-              :universal-link
+     (cond-> current-chat
+       (empty? messages)
+       (assoc :universal-link
               (links/generate-link :public-chat :external current-chat-id))
-       current-chat))))
+       (and (not group-chat)
+            (tribute-to-talk/tribute-paid? contact))
+       (assoc :tribute-paid? true)))))
 
 (re-frame/reg-sub
  :chats/current-chat-message

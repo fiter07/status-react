@@ -3,6 +3,7 @@
   (:require [re-frame.core :as re-frame]
             [status-im.mailserver.core :as mailserver]
             [status-im.transport.utils :as utils]
+            [status-im.chat.models :as chat]
             [status-im.utils.fx :as fx]
             [status-im.utils.handlers :as handlers]
             [status-im.transport.partitioned-topic :as transport.topic]
@@ -97,7 +98,7 @@
                   (contact/add-contact public-key)
 
                   :open-chat
-                  (contact/open-chat public-key)))]
+                  (chat/start-chat public-key {:navigation-reset? true})))]
              filters-fx-fns
              [(mailserver/process-next-messages-request)])))))
 

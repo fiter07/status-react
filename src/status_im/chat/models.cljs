@@ -5,7 +5,9 @@
             [status-im.data-store.messages :as messages-store]
             [status-im.data-store.user-statuses :as user-statuses-store]
             [status-im.contact-code.core :as contact-code]
+            [status-im.contact.core :as contact.core]
             [status-im.i18n :as i18n]
+            [status-im.tribute-to-talk.core :as tribute-to-talk]
             [status-im.transport.chat.core :as transport.chat]
             [status-im.transport.utils :as transport.utils]
             [status-im.transport.message.protocol :as protocol]
@@ -248,7 +250,9 @@
                        (set-chat-ui-props {:validation-messages nil}))}
               (contact-code/listen-to-chat chat-id)
               (when platform/desktop?
-                (mark-messages-seen chat-id)))))
+                (mark-messages-seen chat-id))
+              (contact.core/create-contact chat-id)
+              (tribute-to-talk/check-manifest chat-id))))
 
 (fx/defn navigate-to-chat
   "Takes coeffects map and chat-id, returns effects necessary for navigation and preloading data"

@@ -20,6 +20,7 @@
             [status-im.models.transactions :as transactions]
             [status-im.i18n :as i18n]
             [status-im.node.core :as node]
+            [status-im.tribute-to-talk.core :as tribute-to-talk]
             [status-im.ui.screens.mobile-network-settings.events :as mobile-network]
             [status-im.chaos-mode.core :as chaos-mode]))
 
@@ -144,6 +145,7 @@
          (fn [_]
            (when save-password?
              {:keychain/save-user-password [address password]}))
+         (tribute-to-talk/init)
          (mobile-network/on-network-status-change)
          (protocol/initialize-protocol)
          (universal-links/process-stored-event)

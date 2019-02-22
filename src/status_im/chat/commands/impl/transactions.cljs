@@ -14,6 +14,8 @@
             [status-im.ui.components.svgimage :as svgimage]
             [status-im.i18n :as i18n]
             [status-im.contact.db :as db.contact]
+
+            [status-im.utils.ethereum.contracts :as contracts]
             [status-im.constants :as constants]
             [status-im.utils.ethereum.core :as ethereum]
             [status-im.utils.ethereum.tokens :as tokens]
@@ -293,37 +295,57 @@
   protocol/Yielding
   (yield-control [_ {{{amount :amount asset :asset} :params} :content} {:keys [db] :as cofx}]
     ;; Prefill wallet and navigate there
-    (let [recipient-contact     (or
-                                 (get-in db [:contacts/contacts (:current-chat-id db)])
-                                 (db.contact/public-key->new-contact (:current-chat-id db)))
+    (if (= asset "STT")
+      (let [{:keys [name address public-key tribute] :as recipient-contact}
+            (or
+             (get-in db [:contacts/contacts (:current-chat-id db)])
+             (db.contact/public-key->new-contact (:current-chat-id db)))
+            chain              (keyword (:chain db))
+            symbol             :STT
+            all-tokens         (:wallet/all-tokens db)
+            {:keys [decimals]} (tokens/asset-for all-tokens chain symbol)
+            {:keys [value]}    (wallet.db/parse-amount amount decimals)]
+        (contracts/call cofx
+                        {:contract :status/snt
+                         :method   :erc20/transfer
+                         :params   [address
+                                    (money/formatted->internal value symbol decimals)]
+                         :details  {:to-name     name
+                                    :public-key  public-key
+                                    :from-chat?  true
+                                    :symbol      symbol
+                                    :amount-text amount}}))
+      (let [recipient-contact     (or
+                                   (get-in db [:contacts/contacts (:current-chat-id db)])
+                                   (db.contact/public-key->new-contact (:current-chat-id db)))
 
-          sender-account        (:account/account db)
-          chain                 (keyword (:chain db))
-          symbol-param          (keyword asset)
-          all-tokens            (:wallet/all-tokens db)
-          {:keys [symbol decimals]} (tokens/asset-for all-tokens chain symbol-param)
-          {:keys [value error]}     (wallet.db/parse-amount amount decimals)
-          next-view-id              (if (:wallet-set-up-passed? sender-account)
-                                      :wallet-send-modal-stack
-                                      :wallet-send-modal-stack-with-onboarding)]
-      (fx/merge cofx
-                {:db (-> db
-                         (update-in [:wallet :send-transaction]
-                                    assoc
-                                    :amount (money/formatted->internal value symbol decimals)
-                                    :amount-text amount
-                                    :amount-error error)
-                         (choose-recipient.events/fill-request-details
-                          (transaction-details recipient-contact symbol) false)
-                         (update-in [:wallet :send-transaction]
-                                    dissoc :id :password :wrong-password?))
-                 ;; TODO(janherich) - refactor wallet send events, updating gas price
-                 ;; is generic thing which shouldn't be defined in wallet.send, then
-                 ;; we can include the utility helper without running into circ-dep problem
-                 :update-gas-price {:web3          (:web3 db)
-                                    :success-event :wallet/update-gas-price-success
-                                    :edit?         false}}
-                (navigation/navigate-to-cofx next-view-id {}))))
+            sender-account        (:account/account db)
+            chain                 (keyword (:chain db))
+            symbol-param          (keyword asset)
+            all-tokens            (:wallet/all-tokens db)
+            {:keys [symbol decimals]} (tokens/asset-for all-tokens chain symbol-param)
+            {:keys [value error]}     (wallet.db/parse-amount amount decimals)
+            next-view-id              (if (:wallet-set-up-passed? sender-account)
+                                        :wallet-send-modal-stack
+                                        :wallet-send-modal-stack-with-onboarding)]
+        (fx/merge cofx
+                  {:db (-> db
+                           (update-in [:wallet :send-transaction]
+                                      assoc
+                                      :amount (money/formatted->internal value symbol decimals)
+                                      :amount-text amount
+                                      :amount-error error)
+                           (choose-recipient.events/fill-request-details
+                            (transaction-details recipient-contact symbol) false)
+                           (update-in [:wallet :send-transaction]
+                                      dissoc :id :password :wrong-password?))
+                   ;; TODO(janherich) - refactor wallet send events, updating gas price
+                   ;; is generic thing which shouldn't be defined in wallet.send, then
+                   ;; we can include the utility helper without running into circ-dep problem
+                   :update-gas-price {:web3          (:web3 db)
+                                      :success-event :wallet/update-gas-price-success
+                                      :edit?         false}}
+                  (navigation/navigate-to-cofx next-view-id {})))))
   protocol/EnhancedParameters
   (enhance-send-parameters [_ parameters cofx]
     (-> parameters

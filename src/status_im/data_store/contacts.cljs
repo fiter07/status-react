@@ -1,6 +1,7 @@
 (ns status-im.data-store.contacts
   (:require [goog.object :as object]
             [re-frame.core :as re-frame]
+            [taoensso.timbre :as log]
             [status-im.data-store.realm.core :as core]
             [clojure.set :as clojure.set]))
 
@@ -97,3 +98,10 @@
   [public-key]
   (fn [realm]
     (core/delete realm (get-contact-by-id public-key realm))))
+
+(defn set-tribute-tx
+  "Returns tx function for setting contact tribute"
+  [public-key tribute]
+  (fn [realm]
+    (let [contact (get-contact-by-id public-key realm)]
+      (aset contact :tribute tribute))))

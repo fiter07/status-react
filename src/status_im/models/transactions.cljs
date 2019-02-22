@@ -385,8 +385,8 @@
         (if-not (or @latest-block-checked
                     (have-unconfirmed-transactions? (vals transaction-map))
                     (not-empty (set/difference chat-transaction-ids transaction-ids)))
-          (done-fn)
-          (transactions-query-helper web3 all-tokens account-address chain done-fn chaos-mode?))))))
+          (done-fn))
+        (transactions-query-helper web3 all-tokens account-address chain done-fn chaos-mode?)))))
 
 (defn- start-sync! [{:keys [:account/account network web3] :as options}]
   (reset! latest-block-checked nil)

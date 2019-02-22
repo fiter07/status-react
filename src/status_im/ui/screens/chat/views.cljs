@@ -4,6 +4,8 @@
             [status-im.contact.db :as contact.db]
             [status-im.group-chats.db :as group-chats.db]
             [status-im.i18n :as i18n]
+            [taoensso.timbre :as log]
+            [status-im.ui.screens.chat.photos :as photos]
             [status-im.ui.components.animation :as animation]
             [status-im.ui.components.button.view :as buttons]
             [status-im.ui.components.chat-icon.screen :as chat-icon.screen]
@@ -26,6 +28,8 @@
             [status-im.ui.screens.chat.styles.main :as style]
             [status-im.ui.screens.chat.toolbar-content :as toolbar-content]
             [status-im.utils.platform :as platform]
+            [status-im.tribute-to-talk.core :as tribute-to-talk]
+            [status-im.ui.screens.profile.tribute-to-talk.views :as tribute-to-talk.views]
             [status-im.utils.utils :as utils])
   (:require-macros [status-im.utils.views :refer [defview letsubs]]))
 
@@ -131,6 +135,60 @@
       [react/animated-view {:style (style/message-view-animated opacity)}
        message-view]]]))
 
+(defn empty-chat-container-one-to-one
+  [{:keys [chat-id name contact]} intro-name tribute-paid?]
+  (let [system-tags (or (:system-tags contact) #{})
+        tribute (:tribute contact)]
+    [react/view
+     [react/view (assoc (dissoc style/empty-chat-container :flex)
+                        :justify-content :flex-end)
+      (cond (and (nil? tribute) (not (system-tags :contact/added))
+                 (not tribute-paid?))
+            [react/view {:style {:align-items :center :justify-content :flex-end}}
+             [react/view {:style {:flex-direction :row :justify-content :center}}
+              [react/text {:style style/loading-text}
+               (i18n/label :t/loading)]
+              [react/activity-indicator {:color colors/gray
+                                         :animating true}]]]
+
+            (and (pos? tribute) (not (system-tags :contact/added)))
+            [react/view {:style {:align-items :center :justify-content :flex-end}}
+             [react/nested-text {:style (assoc style/intro-header-description :margin-top 24)}
+              [{:style (assoc style/intro-header-description :margin-top 24)}
+               (i18n/label :t/tribute-required-by-account {:account-name name})]
+              [{:style {:color colors/blue}
+                :on-press #(re-frame/dispatch [:navigate-to :tribute-learn-more])}
+               (str " " (i18n/label :learn-more))]]]
+            :else
+            [react/nested-text {:style (merge style/intro-header-description
+                                              {:margin-bottom 36})}
+             (i18n/label :t/empty-chat-description-one-to-one)
+             [{} intro-name]])]
+     (when (and (pos? tribute)
+                (not (system-tags :contact/added)))
+       [react/view {:style {:align-items :flex-start
+                            :margin-top 32
+                            :margin-left 8}}
+        [tribute-to-talk.views/pay-to-chat-message
+         {:snt-amount tribute
+          :public-key chat-id
+          :style {}
+          :tribute-status (tribute-to-talk/tribute-status contact)}]
+        [react/view {:style style/are-you-friends-bubble}
+         [react/text {:style (assoc style/are-you-friends-text :font-weight "500")}
+          (i18n/label :t/tribute-to-talk-are-you-friends)]
+         [react/text {:style style/are-you-friends-text}
+          (i18n/label :t/tribute-to-talk-ask-to-be-added)]
+         [react/text {:style style/share-my-profile
+                      :on-press #(re-frame/dispatch [:profile/share-profile-link chat-id])}
+          (i18n/label :t/share-my-profile)]]
+        (when tribute-paid?
+          [react/view
+           [react/nested-text {:style style/tribute-received-note}
+            [{:style (assoc style/tribute-received-note :font-weight "500")} name]
+            [{:style (assoc style/tribute-received-note :color colors/gray)}
+             (i18n/label :tribute-to-talk-contact-received-your-tribute)]]])])]))
+
 (defn join-chat-button [chat-id]
   [buttons/secondary-button {:style style/join-button
                              :on-press #(re-frame/dispatch [:group-chats.ui/join-pressed chat-id])}
@@ -170,7 +228,8 @@
 (defview chat-intro-header-container
   [{:keys [group-chat name pending-invite-inviter-name
            inviter-name color chat-id chat-name public?
-           universal-link]} no-messages]
+           contact
+           universal-link] :as chat} no-messages tribute-paid?]
   (letsubs [intro-status [:chats/current-chat-intro-status]
             height       [:chats/content-layout-height]
             input-height [:chats/current-chat-ui-prop :input-height]]
@@ -179,7 +238,8 @@
       ;; TODO This when check ought to be unnecessary but for now it prevents
       ;; jerky motion when fresh chat is created, when input-height can be null
       ;; affecting the calculation of content-layout-height to be briefly adjusted
-      (when (or input-height pending-invite-inviter-name)
+      (when (or input-height pending-invite-inviter-name
+                (not= (:tribute contact) 0))
         [react/touchable-without-feedback
          {:style    {:flex        1
                      :align-items :flex-start}
@@ -242,15 +302,13 @@
                     [react/text {:style style/intro-header-description}
                      (i18n/label :t/created-group-chat-description
                                  {:group-name intro-name})]))))
-            [react/nested-text {:style (merge style/intro-header-description
-                                              {:margin-bottom 36})}
-             (i18n/label :t/empty-chat-description-one-to-one)
-             [{} intro-name]])]]))))
+            [empty-chat-container-one-to-one chat intro-name tribute-paid?])]]))))
 
 (defview messages-view
-  [{:keys [group-chat chat-id pending-invite-inviter-name] :as chat}
+  [{:keys [group-chat chat-id pending-invite-inviter-name contact tribute-paid?] :as chat}
    modal?]
   (letsubs [messages           [:chats/current-chat-messages-stream]
+            photo-path         [:chats/photo-path chat-id]
             current-public-key [:account/public-key]]
     {:component-did-mount
      (fn [args]
@@ -262,7 +320,7 @@
     (let [no-messages (empty? messages)
           flat-list-conf
           {:data                      messages
-           :footer                    [chat-intro-header-container chat no-messages]
+           :footer                    [chat-intro-header-container chat no-messages tribute-paid?]
            :key-fn                    #(or (:message-id %) (:value %))
            :render-fn                 (fn [message]
                                         [message-row
@@ -280,12 +338,17 @@
         [list/flat-list (merge flat-list-conf group-header)]
         [list/flat-list flat-list-conf]))))
 
-(defn show-input-container? [my-public-key current-chat]
-  (or (not (models.chat/group-chat? current-chat))
-      (group-chats.db/joined? my-public-key current-chat)))
+(defn show-input-container? [my-public-key {:keys [contact] :as current-chat} tribute-paid?]
+  (and (or (or (models.chat/multi-user-chat? current-chat)
+               (zero? (:tribute contact)))
+           (contains? (:system-tags contact) :contact/added)
+           tribute-paid?)
+       (or (not (models.chat/group-chat? current-chat))
+           (group-chats.db/joined? my-public-key current-chat))))
 
 (defview chat-root [modal?]
-  (letsubs [{:keys [public? chat-id] :as current-chat} [:chats/current-chat]
+  (letsubs [{:keys [public? chat-id tribute-paid?] :as current-chat}
+            [:chats/current-chat]
             current-chat-id                            [:chats/current-chat-id]
             my-public-key                              [:account/public-key]
             show-bottom-info?                          [:chats/current-chat-ui-prop :show-bottom-info?]
@@ -302,14 +365,14 @@
                           :style                        style/scroll-root
                           :content-container-style      style/scroll-root
                           :keyboard-should-persist-taps :handled}
-       ^{:key current-chat-id}
+       ^{:key chat-id}
        [react/view {:style     style/chat-view
                     :on-layout (fn [e]
                                  (re-frame/dispatch [:set :layout-height (-> e .-nativeEvent .-layout .-height)]))}
         [chat-toolbar current-chat public? modal?]
         [messages-view-animation
          [messages-view current-chat modal?]]
-        (when (show-input-container? my-public-key current-chat)
+        (when (show-input-container? my-public-key current-chat tribute-paid?)
           [input/container])
         (when show-stickers?
           [stickers/stickers-view])

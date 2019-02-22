@@ -14,10 +14,10 @@
                  :accessibility-label (or accessibility-label :chat-icon)}]
    [react/view {:style (style/photo-border size)}]])
 
-(defview member-photo [from]
+(defview member-photo [from & [size]]
   (letsubs [photo-path [:chats/photo-path from]]
     (photo (if (string/blank? photo-path)
              (identicon/identicon from)
              photo-path)
            {:accessibility-label :member-photo
-            :size                style/default-size})))
+            :size                (or size style/default-size)})))

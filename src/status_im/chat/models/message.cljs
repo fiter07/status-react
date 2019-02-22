@@ -29,6 +29,7 @@
             [status-im.ui.components.react :as react]
             [status-im.utils.fx :as fx]
             [taoensso.timbre :as log]
+            [status-im.tribute-to-talk.core :as tribute-to-talk]
             [status-im.data-store.messages :as messages-store]
             [status-im.transport.message.transit :as transit]))
 
@@ -470,6 +471,7 @@
                                                        :timestamp   now
                                                        :clock-value (utils.clocks/send
                                                                      last-clock-value))
+                                                (tribute-to-talk/add-tx-id db)
                                                 (add-message-type chat))]
     (upsert-and-send cofx message-data)))
 

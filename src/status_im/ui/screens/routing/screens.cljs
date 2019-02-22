@@ -89,6 +89,7 @@
    :stickers                         stickers/packs
    :stickers-pack                    stickers/pack
    :stickers-pack-modal              [:modal stickers/pack-modal]
+   :tribute-learn-more               [:modal tr-to-talk/learn-more]
    :chat-modal                       [:modal chat/chat-modal]
    :show-extension-modal             [:modal extensions.add/show-extension-modal]
    :wallet-send-transaction-modal    [:modal send/send-transaction-modal]

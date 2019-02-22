@@ -476,6 +476,21 @@
           contact-device-info/v1
           contact-recovery/v1])
 
+(def v42 [chat/v14
+          transport/v8
+          contact/v8
+          message/v10
+          mailserver/v11
+          mailserver-topic/v2
+          user-status/v2
+          membership-update/v1
+          installation/v3
+          local-storage/v1
+          browser/v8
+          dapp-permissions/v9
+          contact-device-info/v1
+          contact-recovery/v1])
+
 ;; put schemas ordered by version
 (def schemas [{:schema        v1
                :schemaVersion 1
@@ -599,4 +614,7 @@
                :migration     migrations/v40}
               {:schema        v41
                :schemaVersion 41
+               :migration     (constantly nil)}
+              {:schema        v42
+               :schemaVersion 42
                :migration     (constantly nil)}])

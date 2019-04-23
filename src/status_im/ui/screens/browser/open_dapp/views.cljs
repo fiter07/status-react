@@ -50,15 +50,14 @@
                   url-text (atom nil)]
     [react/keyboard-avoiding-view {:style {:flex 1}}
      [status-bar/status-bar]
-     [react/view styles/input-container
-      [react/text-input {:on-change-text      #(reset! url-text %)
-                         :on-submit-editing   #(re-frame/dispatch [:browser.ui/dapp-url-submitted @url-text])
-                         :placeholder         (i18n/label :t/enter-url)
-                         :auto-capitalize     :none
-                         :auto-correct        false
-                         :style               styles/input
-                         :accessibility-label :dapp-url-input
-                         :return-key-type     :go}]]
+     [react/text-input {:on-change-text      #(reset! url-text %)
+                        :on-submit-editing   #(re-frame/dispatch [:browser.ui/dapp-url-submitted @url-text])
+                        :placeholder         (i18n/label :t/enter-url)
+                        :auto-capitalize     :none
+                        :auto-correct        false
+                        :style               styles/input
+                        :accessibility-label :dapp-url-input
+                        :return-key-type     :go}]
      [components/separator]
      (if (empty? browsers)
        [list-header true]

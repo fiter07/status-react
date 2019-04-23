@@ -25,6 +25,13 @@
             [status-im.utils.ethereum.abi-spec :as abi-spec]
             [status-im.utils.ethereum.erc20 :as erc20]))
 
+(fx/defn enable-whitelist
+  [{:keys [db] :as cofx}]
+  (if (tribute-to-talk.db/enabled? db)
+    {:db (assoc db :contacts/whitelist
+                (contact.db/get-contact-whitelist (vals (:contacts/contacts db))))}
+    {:db (dissoc db :contacts/whitelist)}))
+
 (fx/defn update-settings
   [{:keys [db] :as cofx} {:keys [snt-amount message update] :as new-settings}]
   (let [account-settings (get-in db [:account/account :settings])
@@ -43,12 +50,13 @@
                                    (dissoc :update))]
     (println :settings tribute-to-talk-settings
              :new-settings new-settings)
-    (accounts.update/update-settings
-     cofx
-     (-> account-settings
-         (assoc-in [:tribute-to-talk chain-keyword]
-                   tribute-to-talk-settings))
-     {})))
+    (fx/merge cofx
+              (accounts.update/update-settings
+               (-> account-settings
+                   (assoc-in [:tribute-to-talk chain-keyword]
+                             tribute-to-talk-settings))
+               {})
+              enable-whitelist)))
 
 (fx/defn mark-ttt-as-seen
   [{:keys [db] :as cofx}]

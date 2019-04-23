@@ -106,7 +106,7 @@
         (-> db
             (get-in [:wallet :transactions tribute-tx-id :confirmations] 0)
             js/parseInt
-            (>= 12)))))
+            (>= 1)))))
 
 (defrecord Message [content content-type message-type clock-value timestamp]
   StatusMessage

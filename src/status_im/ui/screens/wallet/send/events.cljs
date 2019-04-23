@@ -37,9 +37,11 @@
 (re-frame/reg-fx
  ::send-transaction
  (fn [[params all-tokens symbol chain on-completed masked-password]]
-   (case symbol
-     :ETH (send-ethers params on-completed masked-password)
-     :STT (send-ethers params on-completed masked-password)
+   (if (or (= symbol :ETH)
+           (and (= symbol :STT)
+                (:data params)
+                (= "0x0" (:value params))))
+     (send-ethers params on-completed masked-password)
      (send-tokens all-tokens symbol chain params on-completed masked-password))))
 
 (re-frame/reg-fx
